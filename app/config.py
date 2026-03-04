@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     admin_username: str = "admin"
     admin_password: str = "admin123"
+    password_hash_scheme: str = "bcrypt"
 
     alert_webhook_url: str = ""
     alert_webhook_enabled: bool = False

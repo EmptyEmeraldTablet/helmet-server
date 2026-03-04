@@ -2,13 +2,13 @@ from pathlib import Path
 from time import perf_counter
 
 import cv2
-from ultralytics import YOLO
-
 from app.config import settings
 
 
 class InferenceEngine:
     def __init__(self, weights_path: str, confidence: float) -> None:
+        from ultralytics import YOLO
+
         weights = Path(weights_path)
         if not weights.exists():
             raise FileNotFoundError(f"Weights not found: {weights_path}")

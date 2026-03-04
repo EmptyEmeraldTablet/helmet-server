@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import alerts, auth, devices, settings, stats, upload, websocket
+from app.api import alerts, auth, devices, settings as settings_api, stats, upload, websocket
 from app.config import settings
 from app.core.broadcast import ConnectionManager
 from app.core.cleanup import cleanup_loop
@@ -45,7 +45,7 @@ app.include_router(auth.router, prefix=settings.api_prefix, tags=["auth"])
 app.include_router(devices.router, prefix=settings.api_prefix, tags=["devices"])
 app.include_router(alerts.router, prefix=settings.api_prefix, tags=["alerts"])
 app.include_router(stats.router, prefix=settings.api_prefix, tags=["stats"])
-app.include_router(settings.router, prefix=settings.api_prefix, tags=["settings"])
+app.include_router(settings_api.router, prefix=settings.api_prefix, tags=["settings"])
 app.include_router(websocket.router, tags=["websocket"])
 
 

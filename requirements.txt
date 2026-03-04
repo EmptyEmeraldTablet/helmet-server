@@ -10,3 +10,6 @@ ultralytics
 opencv-python
 passlib[bcrypt]
 python-jose[cryptography]
+pytest
+pytest-asyncio
+requests
