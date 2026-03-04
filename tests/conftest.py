@@ -19,6 +19,30 @@ from app.models import AdminUser
 from app.utils.security import hash_secret
 
 
+class _StubEngine:
+    def predict(self, image_path: str):
+        detections = [
+            {
+                "label": "person",
+                "confidence": 0.95,
+                "bbox": [10.0, 10.0, 120.0, 180.0],
+            },
+            {
+                "label": "no_helmet",
+                "confidence": 0.88,
+                "bbox": [40.0, 20.0, 90.0, 80.0],
+            },
+        ]
+        return detections, 12.3, None
+
+
+@pytest.fixture()
+def stub_inference(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.core import queue_worker
+
+    monkeypatch.setattr(queue_worker, "get_engine", lambda: _StubEngine())
+
+
 async def _ensure_admin() -> None:
     async with SessionLocal() as session:
         result = await session.execute(select(AdminUser).where(AdminUser.username == 'admin'))
@@ -31,7 +55,7 @@ async def _ensure_admin() -> None:
 
 
 @pytest.fixture()
-def client() -> TestClient:
+def client(stub_inference: None) -> TestClient:
     with TestClient(app) as client:
         asyncio.run(_ensure_admin())
         yield client
