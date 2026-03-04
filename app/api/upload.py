@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.queue_worker import TaskItem, TaskQueue
 from app.db.database import get_db_session
-from app.models import Task
+from app.dependencies import get_current_device
+from app.models import Device, Task
 from app.schemas.common import ApiResponse
 from app.schemas.upload import Detection, UploadResponseData
 from app.utils.image import save_upload_file
@@ -34,9 +35,13 @@ async def upload_image(
     device_id: str = Form(...),
     session: AsyncSession = Depends(get_db_session),
     queue: TaskQueue = Depends(get_queue),
+    device: Device = Depends(get_current_device),
 ) -> ApiResponse[UploadResponseData]:
     if queue.queue.full():
         raise HTTPException(status_code=503, detail="Queue full")
+
+    if device_id != device.id:
+        raise HTTPException(status_code=400, detail="Device ID mismatch")
 
     if file.content_type not in {"image/jpeg", "image/png"}:
         raise HTTPException(status_code=400, detail="Invalid image format")

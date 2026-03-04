@@ -11,7 +11,7 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    device_id: Mapped[str] = mapped_column(String(64), index=True)
+    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id"), index=True)
     status: Mapped[str] = mapped_column(String(16), default="pending")
     original_image_path: Mapped[str] = mapped_column(String(256))
     annotated_image_path: Mapped[str | None] = mapped_column(String(256), nullable=True)
@@ -26,6 +26,12 @@ class Task(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    alert: Mapped["Alert" | None] = relationship(
+        back_populates="task",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    device: Mapped["Device"] = relationship(back_populates="tasks")
 
 
 class Detection(Base):

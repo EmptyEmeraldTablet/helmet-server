@@ -14,6 +14,17 @@ class Settings(BaseSettings):
     inference_confidence: float = 0.5
     max_queue_size: int = 10
 
+    jwt_secret: str = "change-me"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 480
+
+    admin_username: str = "admin"
+    admin_password: str = "admin123"
+
+    alert_webhook_url: str = ""
+    alert_webhook_enabled: bool = False
+    data_retention_days: int = 30
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
