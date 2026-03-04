@@ -3,8 +3,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
-from app.api import alerts, auth, devices, settings as settings_api, stats, upload, websocket
+from app.api import alerts, auth, devices, results, settings as settings_api, stats, upload, websocket
 from app.config import settings
 from app.core.broadcast import ConnectionManager
 from app.core.cleanup import cleanup_loop
@@ -12,6 +13,8 @@ from app.core.queue_worker import TaskQueue, worker_loop
 from app.db.database import SessionLocal
 from app.db.init_db import init_db
 from app.utils.image import ensure_storage_dirs
+
+ensure_storage_dirs()
 
 
 @asynccontextmanager
@@ -39,12 +42,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.mount("/storage", StaticFiles(directory=settings.storage_dir), name="storage")
 
 app.include_router(upload.router, prefix=settings.api_prefix, tags=["upload"])
 app.include_router(auth.router, prefix=settings.api_prefix, tags=["auth"])
 app.include_router(devices.router, prefix=settings.api_prefix, tags=["devices"])
 app.include_router(alerts.router, prefix=settings.api_prefix, tags=["alerts"])
 app.include_router(stats.router, prefix=settings.api_prefix, tags=["stats"])
+app.include_router(results.router, prefix=settings.api_prefix, tags=["results"])
 app.include_router(settings_api.router, prefix=settings.api_prefix, tags=["settings"])
 app.include_router(websocket.router, tags=["websocket"])
 

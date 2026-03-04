@@ -11,7 +11,7 @@ from app.dependencies import get_current_device
 from app.models import Device, Task
 from app.schemas.common import ApiResponse
 from app.schemas.upload import Detection, UploadResponseData
-from app.utils.image import save_upload_file
+from app.utils.image import build_storage_url, save_upload_file
 
 router = APIRouter()
 
@@ -76,7 +76,7 @@ async def upload_image(
     data = UploadResponseData(
         task_id=task.id,
         status=task.status,
-        annotated_image_url=task.annotated_image_path,
+        annotated_image_url=build_storage_url(task.annotated_image_path),
         detections=detections,
         has_violation=task.has_violation,
         process_time_ms=task.process_time_ms,

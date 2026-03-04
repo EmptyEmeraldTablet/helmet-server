@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.broadcast import ConnectionManager
 from app.core.inference import get_engine
 from app.models import Alert, Detection, Task
+from app.utils.image import build_storage_url
 
 
 @dataclass
@@ -96,8 +97,8 @@ async def process_task(
                 "task_id": task.id,
                 "device_id": task.device_id,
                 "created_at": task.created_at.isoformat() + "Z",
-                "original_image_url": task.original_image_path,
-                "annotated_image_url": task.annotated_image_path,
+                "original_image_url": build_storage_url(task.original_image_path),
+                "annotated_image_url": build_storage_url(task.annotated_image_path),
                 "detections": detections,
                 "has_violation": task.has_violation,
             },
@@ -111,7 +112,7 @@ async def process_task(
                     "task_id": task.id,
                     "device_id": task.device_id,
                     "created_at": datetime.utcnow().isoformat() + "Z",
-                    "annotated_image_url": task.annotated_image_path,
+                    "annotated_image_url": build_storage_url(task.annotated_image_path),
                     "violation_count": violation_count,
                 },
             }
