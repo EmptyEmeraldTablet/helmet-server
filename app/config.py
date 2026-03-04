@@ -1,0 +1,20 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    app_name: str = "Helmet Detection Server"
+    api_prefix: str = "/api"
+
+    storage_dir: str = "storage"
+    original_dir: str = "storage/original"
+    annotated_dir: str = "storage/annotated"
+    weights_path: str = "weights/best.pt"
+
+    database_url: str = "sqlite+aiosqlite:///./helmet.db"
+    inference_confidence: float = 0.5
+    max_queue_size: int = 10
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+
+settings = Settings()
