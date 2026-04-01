@@ -27,3 +27,8 @@ class Device(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    stream_sessions: Mapped[list["StreamSession"]] = relationship(
+        back_populates="device",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )

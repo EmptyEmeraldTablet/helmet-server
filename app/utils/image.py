@@ -1,3 +1,4 @@
+import base64
 from pathlib import Path
 from uuid import uuid4
 
@@ -22,6 +23,38 @@ async def save_upload_file(upload: UploadFile) -> str:
     filename = generate_image_name(suffix)
     destination = Path(settings.original_dir) / filename
     content = await upload.read()
+    destination.write_bytes(content)
+    return str(destination)
+
+
+def save_base64_image(data_url: str) -> str:
+    ensure_storage_dirs()
+    if "," not in data_url:
+        raise ValueError("Invalid data URL")
+
+    header, encoded = data_url.split(",", 1)
+    if "base64" not in header:
+        raise ValueError("Invalid data URL encoding")
+
+    mime = "image/jpeg"
+    if header.startswith("data:"):
+        mime = header[5:].split(";")[0] or mime
+
+    suffix = ".jpg"
+    if mime == "image/png":
+        suffix = ".png"
+    elif mime == "image/jpeg":
+        suffix = ".jpg"
+    else:
+        raise ValueError("Unsupported image type")
+
+    try:
+        content = base64.b64decode(encoded, validate=True)
+    except ValueError as exc:
+        raise ValueError("Invalid base64 payload") from exc
+
+    filename = generate_image_name(suffix)
+    destination = Path(settings.original_dir) / filename
     destination.write_bytes(content)
     return str(destination)
 

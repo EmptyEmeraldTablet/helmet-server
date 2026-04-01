@@ -15,13 +15,19 @@ class Task(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id"), index=True)
     status: Mapped[str] = mapped_column(String(16), default="pending")
-    original_image_path: Mapped[str] = mapped_column(String(256))
+    original_image_path: Mapped[str | None] = mapped_column(String(256), nullable=True)
     annotated_image_path: Mapped[str | None] = mapped_column(String(256), nullable=True)
     process_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     has_violation: Mapped[bool] = mapped_column(Boolean, default=False)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    session_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("stream_sessions.id"), nullable=True, index=True
+    )
+    frame_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("stream_frames.id"), nullable=True, index=True
+    )
 
     detections: Mapped[list["Detection"]] = relationship(
         back_populates="task",
@@ -34,6 +40,8 @@ class Task(Base):
         uselist=False,
     )
     device: Mapped["Device"] = relationship(back_populates="tasks")
+    session: Mapped["StreamSession | None"] = relationship(back_populates="tasks")
+    frame: Mapped["StreamFrame | None"] = relationship(back_populates="task")
 
 
 class Detection(Base):

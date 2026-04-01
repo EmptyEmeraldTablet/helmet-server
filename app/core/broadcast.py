@@ -17,4 +17,7 @@ class ConnectionManager:
 
     async def broadcast(self, message: dict[str, Any]) -> None:
         for connection in list(self.active_connections):
-            await connection.send_json(message)
+            try:
+                await connection.send_json(message)
+            except Exception:  # noqa: BLE001
+                self.disconnect(connection)

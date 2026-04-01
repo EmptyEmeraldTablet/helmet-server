@@ -22,16 +22,22 @@ async def lifespan(app: FastAPI):
     ensure_storage_dirs()
     await init_db()
     app.state.session_factory = SessionLocal
-    queue = TaskQueue(settings.max_queue_size)
-    upload.set_queue(queue)
+    upload_queue = TaskQueue(settings.max_queue_size)
+    stream_queue = TaskQueue(settings.max_queue_size)
+    upload.set_queue(upload_queue)
+    websocket.set_stream_queue(stream_queue)
 
     manager = ConnectionManager()
     websocket.set_manager(manager)
 
-    worker_task = asyncio.create_task(worker_loop(queue, app.state.session_factory, manager))
+    worker_task = asyncio.create_task(worker_loop(upload_queue, app.state.session_factory, manager))
+    stream_worker_task = asyncio.create_task(
+        worker_loop(stream_queue, app.state.session_factory, manager)
+    )
     cleanup_task = asyncio.create_task(cleanup_loop(app.state.session_factory))
     yield
     worker_task.cancel()
+    stream_worker_task.cancel()
     cleanup_task.cancel()
 
 

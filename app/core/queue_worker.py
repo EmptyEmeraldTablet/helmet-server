@@ -1,12 +1,13 @@
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.broadcast import ConnectionManager
 from app.core.inference import get_engine
-from app.models import Alert, Detection, Task
+from app.models import Alert, Detection, StreamFrame, Task
 from app.utils.image import build_storage_url
 
 
@@ -14,7 +15,8 @@ from app.utils.image import build_storage_url
 class TaskItem:
     task_id: str
     image_path: str
-    event: asyncio.Event
+    event: asyncio.Event | None = None
+    frame_id: str | None = None
 
 
 class TaskQueue:
@@ -24,11 +26,26 @@ class TaskQueue:
     async def put(self, item: TaskItem) -> None:
         await self.queue.put(item)
 
+    def put_nowait(self, item: TaskItem) -> bool:
+        try:
+            self.queue.put_nowait(item)
+        except asyncio.QueueFull:
+            return False
+        return True
+
     async def get(self) -> TaskItem:
         return await self.queue.get()
 
     def task_done(self) -> None:
         self.queue.task_done()
+
+    def drop_oldest(self) -> TaskItem | None:
+        try:
+            item = self.queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+        self.queue.task_done()
+        return item
 
 
 async def worker_loop(task_queue: TaskQueue, session_factory, broadcaster: ConnectionManager | None) -> None:
@@ -36,7 +53,8 @@ async def worker_loop(task_queue: TaskQueue, session_factory, broadcaster: Conne
         task_item = await task_queue.get()
         async with session_factory() as session:
             await process_task(session, task_item, broadcaster)
-        task_item.event.set()
+        if task_item.event:
+            task_item.event.set()
         task_queue.task_done()
 
 
@@ -52,9 +70,14 @@ async def process_task(
 
     detections: list[dict] = []
     violation_count = 0
+    frame: StreamFrame | None = None
+    if task.frame_id:
+        frame = await session.get(StreamFrame, task.frame_id)
     try:
+        if not task.original_image_path:
+            raise RuntimeError("Missing image path")
         engine = get_engine()
-        detections, elapsed_ms, annotated_path = engine.predict(task_item.image_path)
+        detections, elapsed_ms, annotated_path = engine.predict(task.original_image_path)
         task.status = "completed"
         task.process_time_ms = int(elapsed_ms)
         task.annotated_image_path = annotated_path
@@ -88,12 +111,34 @@ async def process_task(
         task.error_message = str(exc)
         task.completed_at = datetime.utcnow()
     finally:
+        if frame:
+            frame.status = "processed" if task.status == "completed" else "dropped"
+        await session.commit()
+
+    if frame and task.status == "completed" and not task.has_violation:
+        if task.original_image_path:
+            Path(task.original_image_path).unlink(missing_ok=True)
+            task.original_image_path = None
+        if task.annotated_image_path:
+            Path(task.annotated_image_path).unlink(missing_ok=True)
+            task.annotated_image_path = None
+        frame.image_path = None
         await session.commit()
 
     if broadcaster and task.status == "completed":
+        latency_ms = None
+        frame_index = None
+        stream_id = None
+        if frame:
+            frame_index = frame.frame_index
+            stream_id = frame.session_id
+            if frame.captured_at:
+                latency_ms = int((datetime.utcnow() - frame.captured_at).total_seconds() * 1000)
         payload = {
             "event": "new_result",
             "data": {
+                "stream_id": stream_id,
+                "frame_index": frame_index,
                 "task_id": task.id,
                 "device_id": task.device_id,
                 "created_at": task.created_at.isoformat() + "Z",
@@ -101,6 +146,7 @@ async def process_task(
                 "annotated_image_url": build_storage_url(task.annotated_image_path),
                 "detections": detections,
                 "has_violation": task.has_violation,
+                "latency_ms": latency_ms,
             },
         }
         await broadcaster.broadcast(payload)
@@ -109,6 +155,8 @@ async def process_task(
             alert_payload = {
                 "event": "alert",
                 "data": {
+                    "stream_id": stream_id,
+                    "frame_index": frame_index,
                     "task_id": task.id,
                     "device_id": task.device_id,
                     "created_at": datetime.utcnow().isoformat() + "Z",
