@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.broadcast import ConnectionManager
@@ -11,7 +12,7 @@ from app.core.queue_worker import TaskItem, TaskQueue
 from app.db.database import get_db_session
 from app.models import Device, StreamFrame, StreamSession, Task
 from app.utils.image import save_base64_image
-from app.utils.security import decode_token
+from app.utils.security import decode_token, verify_secret
 
 router = APIRouter()
 
@@ -116,14 +117,32 @@ async def monitor_ws(websocket: WebSocket) -> None:
         manager.disconnect(websocket)
 
 
+async def get_device_for_api_key(
+    session: AsyncSession, api_key: str
+) -> Device | None:
+    result = await session.execute(select(Device))
+    devices = result.scalars().all()
+    for device in devices:
+        if verify_secret(api_key, device.api_key_hash):
+            if device.status != "active":
+                return None
+            return device
+    return None
+
+
 @router.websocket("/ws/stream")
 async def stream_ws(
     websocket: WebSocket,
     session: AsyncSession = Depends(get_db_session),
     queue: TaskQueue = Depends(get_stream_queue),
 ) -> None:
-    token = websocket.query_params.get("token")
-    if not token or not decode_token(token):
+    api_key = websocket.query_params.get("api_key")
+    if not api_key:
+        await websocket.close(code=1008)
+        return
+
+    device = await get_device_for_api_key(session, api_key)
+    if device is None:
         await websocket.close(code=1008)
         return
 
@@ -158,9 +177,8 @@ async def stream_ws(
                     await send_error(websocket, "invalid_payload", "Stream already active", stream_id)
                     continue
 
-                device = await session.get(Device, device_id)
-                if device is None or device.status != "active":
-                    await send_error(websocket, "invalid_payload", "Device not active", stream_id)
+                if device_id != device.id:
+                    await send_error(websocket, "invalid_payload", "Device mismatch", stream_id)
                     continue
 
                 existing = await session.get(StreamSession, stream_id)
@@ -170,7 +188,7 @@ async def stream_ws(
 
                 stream_session = StreamSession(
                     id=stream_id,
-                    device_id=device_id,
+                    device_id=device.id,
                     status="active",
                     fps_target=int(fps),
                     resolution=str(resolution),
@@ -181,7 +199,7 @@ async def stream_ws(
                 device.last_seen_at = datetime.utcnow()
                 await session.commit()
 
-                active_streams[stream_id] = device_id
+                active_streams[stream_id] = device.id
                 await websocket.send_json(
                     {
                         "event": "ack",

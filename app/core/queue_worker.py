@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.broadcast import ConnectionManager
+from app.config import settings
 from app.core.inference import get_engine
 from app.models import Alert, Detection, StreamFrame, Task
 from app.utils.image import build_storage_url
@@ -115,7 +116,12 @@ async def process_task(
             frame.status = "processed" if task.status == "completed" else "dropped"
         await session.commit()
 
-    if frame and task.status == "completed" and not task.has_violation:
+    if (
+        frame
+        and task.status == "completed"
+        and not task.has_violation
+        and not settings.preserve_stream_data
+    ):
         if task.original_image_path:
             Path(task.original_image_path).unlink(missing_ok=True)
             task.original_image_path = None

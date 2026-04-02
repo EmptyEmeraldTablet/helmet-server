@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     alert_webhook_url: str = ""
     alert_webhook_enabled: bool = False
     data_retention_days: int = 30
+    preserve_stream_data: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

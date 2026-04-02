@@ -10,6 +10,8 @@ from app.models import Alert, Detection, StreamFrame, StreamSession, Task
 
 
 async def cleanup_once(session: AsyncSession) -> None:
+    if settings.preserve_stream_data:
+        return
     cutoff = datetime.utcnow() - timedelta(days=settings.data_retention_days)
 
     result = await session.execute(select(Task).where(Task.created_at < cutoff))
